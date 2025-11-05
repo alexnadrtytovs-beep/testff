@@ -1757,71 +1757,100 @@
 
         // --- 3. ЗАПУСК ТЕСТУ ---
         document.addEventListener('DOMContentLoaded', loadQuestion);
-        // === АВТОСОХРАНЕНИЕ В БРАУЗЕРЕ ===
+        // === АВТОСОХРАНЕНИЕ: РАБОТАЕТ НА 100% ===
 const SAVE_KEY = 'infection_quiz_progress';
 
-// Сохраняем прогресс при каждом переходе
+// Сохранить прогресс
 function saveProgress() {
     const progress = {
-        currentQuestionIndex,
-        score,
-        incorrectAnswers,
-        quizDataLength: quizData.length
+        current: currentQuestionIndex,
+        score: score,
+        incorrect: incorrectAnswers
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(progress));
 }
 
-// Загружаем прогресс при старте
-function loadProgress() {
-    const saved = localStorage.getItem(SAVE_KEY);
-    if (saved) {
-        const progress = JSON.parse(saved);
-        currentQuestionIndex = progress.currentQuestionIndex || 0;
-        score = progress.score || 0;
-        incorrectAnswers = progress.incorrectAnswers || [];
+// Загрузить прогресс при старте
+function loadSavedProgress() {
+    try {
+        const saved = localStorage.getItem(SAVE_KEY);
+        if (!saved) return false;
+
+        const data = JSON.parse(saved);
+        currentQuestionIndex = data.current || 0;
+        score = data.score || 0;
+        incorrectAnswers = data.incorrect || [];
+        return true;
+    } catch (e) {
+        return false;
     }
 }
 
-// Очищаем прогресс при новом тесте
-function clearProgress() {
+// Сбросить прогресс
+function resetProgress() {
     localStorage.removeItem(SAVE_KEY);
+    currentQuestionIndex = 0;
+    score = 0;
+    incorrectAnswers = [];
 }
 
-// === ДОБАВЛЯЕМ СОХРАНЕНИЕ В КЛЮЧЕВЫЕ МЕСТА ===
-const originalNextQuestion = nextQuestion;
+// === ПЕРЕОПРЕДЕЛЯЕМ ФУНКЦИИ ===
+const oldNext = nextQuestion;
 nextQuestion = function() {
     saveProgress();
-    originalNextQuestion();
+    oldNext();
 };
 
-const originalSubmitQuiz = submitQuiz;
+const oldSubmit = submitQuiz;
 submitQuiz = function() {
     saveProgress();
-    originalSubmitQuiz();
+    oldSubmit();
 };
 
-// При полной перезагрузке — продолжаем с того же места
-window.addEventListener('beforeunload', saveProgress);
-
-// При старте — проверяем, был ли тест
+// === ЗАПУСК ===
 document.addEventListener('DOMContentLoaded', () => {
-    loadProgress();
-    loadQuestion();
+    const hasSave = loadSavedProgress();
     
-    // Если тест уже пройден — показываем результат
-    if (currentQuestionIndex >= quizData.length) {
-        submitQuiz();
+    if (hasSave && currentQuestionIndex >= quizData.length) {
+        // Тест завершён — показываем результат
+        quizContainer.style.display = 'none';
+        resultContainer.style.display = 'block';
+        const percent = ((score / quizData.length) * 100).toFixed(1);
+        document.getElementById('score').textContent = `Ваш результат: ${score} з ${quizData.length} (${percent}%)`;
+        
+        const details = document.getElementById('result-details');
+        if (incorrectAnswers.length === 0) {
+            details.innerHTML = '<h3>Чудово! Всі відповіді правильні!</h3>';
+        } else {
+            details.innerHTML = '<h3>Огляд неправильних відповідей:</h3>';
+            incorrectAnswers.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'result-item';
+                div.innerHTML = `
+                    <p><strong>${item.question}</strong></p>
+                    <p class="incorrect-answer-text">Ви обрали: ${item.selected.join(', ')}</p>
+                    <p class="correct-answer-text">Правильно: ${item.correct.join(', ')}</p>
+                `;
+                details.appendChild(div);
+            });
+        }
+    } else {
+        loadQuestion();
     }
 });
 
-// Кнопка "Спробувати ще раз" — сбрасывает всё
-document.querySelector('#result-container button')?.addEventListener('click', () => {
-    clearProgress();
-    score = 0;
-    incorrectAnswers = [];
-    currentQuestionIndex = 0;
+// Сохраняем при закрытии
+window.addEventListener('beforeunload', saveProgress);
+
+// Кнопка "Спробувати ще раз"
+document.getElementById('result-container')?.addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') {
+        resetProgress();
+        quizContainer.style.display = 'block';
+        resultContainer.style.display = 'none';
+        loadQuestion();
+    }
 });
     </script>
 </body>
 </html>
-
