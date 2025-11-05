@@ -1757,6 +1757,71 @@
 
         // --- 3. ЗАПУСК ТЕСТУ ---
         document.addEventListener('DOMContentLoaded', loadQuestion);
+        // === АВТОСОХРАНЕНИЕ В БРАУЗЕРЕ ===
+const SAVE_KEY = 'infection_quiz_progress';
+
+// Сохраняем прогресс при каждом переходе
+function saveProgress() {
+    const progress = {
+        currentQuestionIndex,
+        score,
+        incorrectAnswers,
+        quizDataLength: quizData.length
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(progress));
+}
+
+// Загружаем прогресс при старте
+function loadProgress() {
+    const saved = localStorage.getItem(SAVE_KEY);
+    if (saved) {
+        const progress = JSON.parse(saved);
+        currentQuestionIndex = progress.currentQuestionIndex || 0;
+        score = progress.score || 0;
+        incorrectAnswers = progress.incorrectAnswers || [];
+    }
+}
+
+// Очищаем прогресс при новом тесте
+function clearProgress() {
+    localStorage.removeItem(SAVE_KEY);
+}
+
+// === ДОБАВЛЯЕМ СОХРАНЕНИЕ В КЛЮЧЕВЫЕ МЕСТА ===
+const originalNextQuestion = nextQuestion;
+nextQuestion = function() {
+    saveProgress();
+    originalNextQuestion();
+};
+
+const originalSubmitQuiz = submitQuiz;
+submitQuiz = function() {
+    saveProgress();
+    originalSubmitQuiz();
+};
+
+// При полной перезагрузке — продолжаем с того же места
+window.addEventListener('beforeunload', saveProgress);
+
+// При старте — проверяем, был ли тест
+document.addEventListener('DOMContentLoaded', () => {
+    loadProgress();
+    loadQuestion();
+    
+    // Если тест уже пройден — показываем результат
+    if (currentQuestionIndex >= quizData.length) {
+        submitQuiz();
+    }
+});
+
+// Кнопка "Спробувати ще раз" — сбрасывает всё
+document.querySelector('#result-container button')?.addEventListener('click', () => {
+    clearProgress();
+    score = 0;
+    incorrectAnswers = [];
+    currentQuestionIndex = 0;
+});
     </script>
 </body>
 </html>
+
